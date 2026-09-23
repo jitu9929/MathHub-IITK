@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MathHub IITK</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <div class="brand">📐 <span>MathHub IITK</span></div>
+  <nav>
+    <button onclick="goHome()">Home</button>
+    <button onclick="openAdmin()">Admin</button>
+  </nav>
+</header>
+
+<main id="app">
+  <section id="homePage">
+    <div class="hero">
+      <div class="hero-glow glow-one"></div><div class="hero-glow glow-two"></div>
+      <div class="hero-content">
+        <div class="hero-badge">✦ IIT KANPUR • MATHEMATICS</div>
+        <h1>MathHub <span>IITK</span></h1>
+        <p>Your clean, organized space for <b>PYQs, Notes & study material.</b></p>
+        <div class="hero-pills"><span>📝 PYQs</span><span>📚 Notes</span><span>🎓 4 Semesters</span></div>
+      </div>
+    </div>
+    <div class="container">
+      <h2>Select Semester</h2>
+      <div class="semester-grid" id="semesterGrid"></div>
+    </div>
+  </section>
+
+  <section id="semesterPage" class="hidden">
+    <div class="container">
+      <button class="back" onclick="goHome()">← Back to Semesters</button>
+      <div class="page-title">
+        <div class="eyebrow">SEMESTER</div>
+        <h1 id="semesterTitle"></h1>
+        <p>Select an academic year.</p>
+      </div>
+      <div class="year-grid" id="yearGrid"></div>
+    </div>
+  </section>
+
+  <section id="yearPage" class="hidden">
+    <div class="container">
+      <button class="back" onclick="openSemester(currentSemester)">← Back to Semester</button>
+      <div class="page-title">
+        <div class="eyebrow" id="breadcrumb"></div>
+        <h1 id="yearTitle"></h1>
+      </div>
+      <div class="resource-columns">
+        <div class="resource-card">
+          <div class="resource-head"><span>📝</span><div><h2>PYQs</h2><p>Previous Year Questions</p></div></div>
+          <div id="pyqList"></div>
+          <button class="add-btn" onclick="openAdd('PYQ')">＋ Add PYQ</button>
+        </div>
+        <div class="resource-card">
+          <div class="resource-head"><span>📚</span><div><h2>Notes</h2><p>Lecture & study notes</p></div></div>
+          <div id="notesList"></div>
+          <button class="add-btn" onclick="openAdd('Notes')">＋ Add Notes</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="adminPage" class="hidden">
+    <div class="container">
+      <button class="back" onclick="goHome()">← Back</button>
+      <div class="page-title">
+  <div class="eyebrow">MANAGEMENT</div>
+  <h1>Admin</h1>
+  <p>Add years and study material to any semester.</p>
+</div>
+<div class="admin-profile">
+  <div class="profile-photo-wrap">
+    <div class="photo-placeholder" id="profilePlaceholder">JK</div>
+    <img class="profile-photo" id="profilePhoto" alt="Admin profile photo">
+  </div>
+  <div class="profile-info">
+    <div class="eyebrow">ADMIN PROFILE</div>
+    <h2>Jitendra Kuri</h2>
+    <p>Batch <strong>Y25</strong></p>
+    <label class="photo-upload">📷 Add / Change Photo
+      <input type="file" id="profilePhotoInput" accept="image/*" onchange="previewProfilePhoto(event)">
+    </label>
+  </div>
+</div>
+<div class="admin-box">
+  <h2>Admin Contact</h2>
+  <div class="contact-form">
+    <label>Email Address
+      <input id="adminEmail" type="email" placeholder="your@email.com">
+    </label>
+    <button class="primary" onclick="saveAdminProfile()">Save Profile</button>
+  </div>
+</div>
+      <div class="admin-box">
+        <h2>Add Academic Year</h2>
+        <div class="inline-form">
+          <select id="adminSemester"></select>
+          <input id="adminYear" placeholder="e.g. 2026">
+          <button class="primary" onclick="addYear()">Add Year</button>
+        </div>
+      </div>
+      <div class="admin-box">
+        <h2>Current structure</h2>
+        <div id="adminStructure"></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<div class="modal hidden" id="modal">
+ <div class="modal-box">
+   <button class="close" onclick="closeModal()">×</button>
+   <div class="eyebrow" id="modalType"></div>
+   <h2 id="modalTitle"></h2>
+   <label>Title<input id="itemTitle" placeholder="e.g. End Semester 2025"></label>
+   <label>PDF / File URL<input id="itemUrl" placeholder="Paste public PDF link"></label>
+   <p class="hint">For this first version, upload the PDF somewhere with a public link and paste the link here.</p>
+   <button class="primary full" onclick="saveItem()">Save</button>
+ </div>
+</div>
+
+<footer>📐 MathHub IITK <span>• Created & maintained by Jitendra Kuri</span></footer>
+<script src="app.js"></script>
+</body>
+</html>
