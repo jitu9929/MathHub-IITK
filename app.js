@@ -269,7 +269,7 @@ function renderItems(){
       <div class="item">
         <div class="item-info"><b>${esc(x.title)}</b><small>${x.url?"PDF / Resource":"No file link"}</small></div>
         ${x.url?`<a class="open" target="_blank" rel="noopener" href="${escAttr(x.url)}">Open</a>`:""}
-        <button class="back" onclick="deleteItem('${type}',${i})">×</button>
+        <button class="delete-btn" onclick="deleteItem('${type}',${i})">🗑 Delete</button>
       </div>`).join("") : '<p style="color:#8a93a2;font-size:14px">Nothing added yet.</p>';
   });
   isAdmin().then(ok=>{
@@ -445,14 +445,88 @@ async function addAdminResource(){
 }
 
 function renderAdmin(){
-  document.getElementById("adminStructure").innerHTML=SEMESTERS.map(s=>{
+  const html=SEMESTERS.map(s=>{
     const sk="Semester "+s, courses=courseList(s);
     if(!courses.length) return `<div class="structure-row"><b>Semester ${s}</b><span>No courses added</span></div>`;
-    return `<div class="structure-row"><b>Semester ${s}</b><span>${courses.map(c=>{
-      const years=Object.keys(data[sk][c]||{}).sort((a,b)=>b.localeCompare(a));
-      return `${esc(c)} (${years.length?years.join(", "):"no years"})`;
-    }).join(" • ")}</span></div>`;
+    return `<div class="structure-row"><b>Semester ${s}</b>
+      ${courses.map(c=>{
+        const years=Object.keys(data[sk][c]||{}).sort((a,b)=>b.localeCompare(a));
+        return `<div class="admin-structure-course">
+          <div class="structure-course-head">
+            <strong>${esc(c)}</strong>
+            <button class="delete-btn" data-delete-course="${s}" data-course="${escAttr(c)}">🗑 Delete Course</button>
+          </div>
+          <div class="structure-years">
+            ${years.length ? years.map(y=>`<div class="structure-year">
+              <span>📁 ${esc(y)}</span>
+              <button class="delete-btn small" data-delete-year="${s}" data-course="${escAttr(c)}" data-year="${escAttr(y)}">🗑 Delete Year</button>
+            </div>`).join("") : '<span class="no-year">No academic years added</span>'}
+          </div>
+        </div>`;
+      }).join("")}
+    </div>`;
   }).join("");
+  document.getElementById("adminStructure").innerHTML=html;
+
+  document.querySelectorAll('[data-delete-course]').forEach(btn=>btn.addEventListener('click',()=>{
+    deleteCourse(Number(btn.dataset.deleteCourse),btn.dataset.course);
+  }));
+  document.querySelectorAll('[data-delete-year]').forEach(btn=>btn.addEventListener('click',()=>{
+    deleteYear(Number(btn.dataset.deleteYear),btn.dataset.course,btn.dataset.year);
+  }));
+}
+
+async function deleteCourse(s,c){
+  if(!(await isAdmin())){showLoginModal();return}
+  if(!confirm(`Delete course ${c} and all its academic years and PYQs/Notes? This cannot be undone.`)) return;
+
+  if(supabaseClient){
+    const courseId=await findCourseId(s,c);
+    if(!courseId){alert("Course not found online.");return}
+
+    const {data:years,error:yErr}=await supabaseClient.from("academic_years").select("id").eq("course_id",courseId);
+    if(yErr){alert("Could not load academic years: "+yErr.message);return}
+    const ids=(years||[]).map(y=>y.id);
+
+    if(ids.length){
+      const {error:rErr}=await supabaseClient.from("resources").delete().in("academic_year_id",ids);
+      if(rErr){alert("Could not delete course resources: "+rErr.message);return}
+      const {error:aErr}=await supabaseClient.from("academic_years").delete().eq("course_id",courseId);
+      if(aErr){alert("Could not delete academic years: "+aErr.message);return}
+    }
+
+    const {error:cErr}=await supabaseClient.from("Courses").delete().eq("id",courseId);
+    if(cErr){alert("Could not delete course online: "+cErr.message);return}
+  }
+
+  delete data["Semester "+s][c];
+  save();
+  await loadFromSupabase();
+  fillSemesterSelects(); renderAdmin(); renderHome();
+  alert(`${c} and its related data were deleted.`);
+}
+
+async function deleteYear(s,c,y){
+  if(!(await isAdmin())){showLoginModal();return}
+  if(!confirm(`Delete academic year ${y} under ${c}, including its PYQs/Notes? This cannot be undone.`)) return;
+
+  if(supabaseClient){
+    const courseId=await findCourseId(s,c);
+    if(!courseId){alert("Course not found online.");return}
+    const {data:yr,error:yErr}=await supabaseClient.from("academic_years").select("id").eq("course_id",courseId).eq("academic_year",Number(y)).single();
+    if(yErr || !yr){alert("Academic year not found online.");return}
+
+    const {error:rErr}=await supabaseClient.from("resources").delete().eq("academic_year_id",yr.id);
+    if(rErr){alert("Could not delete year resources: "+rErr.message);return}
+    const {error:dErr}=await supabaseClient.from("academic_years").delete().eq("id",yr.id);
+    if(dErr){alert("Could not delete academic year online: "+dErr.message);return}
+  }
+
+  delete data["Semester "+s][c][y];
+  save();
+  await loadFromSupabase();
+  fillSemesterSelects(); renderAdmin();
+  alert(`Academic year ${y} was deleted.`);
 }
 
 // ---------- PROFILE ----------
