@@ -214,27 +214,86 @@ function openAdd(type){
   document.getElementById("modal").classList.remove("hidden");
 }
 function closeModal(){document.getElementById("modal").classList.add("hidden")}
-function saveItem(){
+async function saveItem(){
   const title=document.getElementById("itemTitle").value.trim();
   const url=document.getElementById("itemUrl").value.trim();
   if(!title){alert("Please enter a title.");return}
+  if(supabaseClient && !(await requireAdmin())) return;
+  if(supabaseClient){
+    const courseId=await getCourseId(currentSemester,currentCourse);
+    if(!courseId){alert("Course not found in Supabase.");return}
+    const yearId=await getYearId(courseId,currentYear);
+    if(!yearId){alert("Academic year not found in Supabase.");return}
+    const {error}=await supabaseClient.from("resources").insert({academic_year_id:yearId,resource_type:currentType,title,file_url:url});
+    if(error){alert("Could not save resource: "+error.message);return}
+    await loadFromSupabase();
+    closeModal(); renderItems(); return;
+  }
   data[semesterKey()][currentCourse][currentYear][currentType].push({title,url});
   save(); closeModal(); renderItems();
 }
-function deleteItem(type,i){
-  if(confirm("Delete this resource?")){
-    data[semesterKey()][currentCourse][currentYear][type].splice(i,1);
-    save(); renderItems();
+async function deleteItem(type,i){
+  if(!confirm("Delete this resource?")) return;
+  if(supabaseClient){
+    if(!(await requireAdmin())) return;
+    const courseId=await getCourseId(currentSemester,currentCourse);
+    const yearId=courseId ? await getYearId(courseId,currentYear) : null;
+    const node=data[semesterKey()][currentCourse][currentYear]||{};
+    const item=node[type] && node[type][i];
+    if(!item || !yearId){alert("Resource not found.");return}
+    const {data:rows,error:qErr}=await supabaseClient.from("resources").select("id").eq("academic_year_id",yearId).eq("resource_type",type).eq("title",item.title).eq("file_url",item.url||"");
+    if(qErr){alert(qErr.message);return}
+    if(!rows || !rows.length){alert("Resource not found in database.");return}
+    const {error}=await supabaseClient.from("resources").delete().eq("id",rows[0].id);
+    if(error){alert("Could not delete: "+error.message);return}
+    await loadFromSupabase(); renderItems(); return;
   }
+  data[semesterKey()][currentCourse][currentYear][type].splice(i,1);
+  save(); renderItems();
+}
+
+async function getCourseId(semester,courseCode){
+  const {data:rows,error}=await supabaseClient.from("Courses").select("id").eq("semester",semester).eq("course_code",courseCode).limit(1);
+  if(error) throw error; return rows && rows[0] ? rows[0].id : null;
+}
+async function getYearId(courseId,year){
+  const {data:rows,error}=await supabaseClient.from("academic_years").select("id").eq("course_id",courseId).eq("academic_year",Number(year)).limit(1);
+  if(error) throw error; return rows && rows[0] ? rows[0].id : null;
 }
 
 // ---------- ADMIN ----------
+let adminUser=null;
+async function requireAdmin(){
+  if(!supabaseClient) return true;
+  const {data:{user}}=await supabaseClient.auth.getUser();
+  if(user){adminUser=user; return true;}
+  alert("Please sign in as Admin first.");
+  showAdminLogin();
+  return false;
+}
+function showAdminLogin(){
+  const page=document.getElementById("adminPage");
+  if(!page || document.getElementById("adminLoginBox")) return;
+  const box=document.createElement("div"); box.className="admin-box"; box.id="adminLoginBox";
+  box.innerHTML=`<h2>Admin Login</h2><div class="inline-form"><input id="adminEmail" type="email" placeholder="Admin email"><input id="adminPassword" type="password" placeholder="Password"><button class="primary" onclick="adminLogin()">Sign in</button></div><p id="adminLoginMsg" class="hint">Only the admin account can add or change website data.</p>`;
+  page.querySelector(".container").insertBefore(box,page.querySelector(".admin-profile"));
+}
+async function adminLogin(){
+  const email=document.getElementById("adminEmail").value.trim(); const password=document.getElementById("adminPassword").value;
+  if(!email||!password){alert("Enter email and password.");return;}
+  const {data,error}=await supabaseClient.auth.signInWithPassword({email,password});
+  if(error){document.getElementById("adminLoginMsg").textContent=error.message;return;}
+  adminUser=data.user; document.getElementById("adminLoginMsg").textContent="Signed in successfully.";
+  document.getElementById("adminLoginBox").remove();
+}
+
 function openAdmin(){
   hideAll();
   document.getElementById("adminPage").classList.remove("hidden");
   fillSemesterSelects();
   renderAdmin();
   loadAdminProfile();
+  if(supabaseClient) showAdminLogin();
 }
 
 function fillSemesterSelects(){
@@ -265,36 +324,44 @@ function populateAdminYears(){
   el.innerHTML=years.length ? years.map(y=>`<option value="${escAttr(y)}">${esc(y)}</option>`).join("") : '<option value="">No year</option>';
 }
 
-function addCourse(){
+async function addCourse(){
+  if(supabaseClient && !(await requireAdmin())) return;
   const s=Number(document.getElementById("adminCourseSemester").value);
   const c=document.getElementById("adminCourse").value.trim().toUpperCase();
   if(!c){alert("Enter a course code/name, e.g. MTH403.");return}
   const sk="Semester "+s;
   if(data[sk][c]){alert("This course already exists.");return}
-  data[sk][c]={};
-  save();
-  document.getElementById("adminCourse").value="";
-  fillSemesterSelects(); renderAdmin(); renderHome();
+  if(supabaseClient){
+    const {error}=await supabaseClient.from("Courses").insert({semester:s,course_code:c,course_name:c});
+    if(error){alert("Could not add course: "+error.message);return}
+    await loadFromSupabase();
+  }else{data[sk][c]={}; save();}
+  document.getElementById("adminCourse").value=""; fillSemesterSelects(); renderAdmin(); renderHome();
   alert(`${c} added to Semester ${s}.`);
 }
 
-function addYear(){
+async function addYear(){
+  if(supabaseClient && !(await requireAdmin())) return;
   const s=Number(document.getElementById("adminYearSemester").value);
   const c=document.getElementById("adminYearCourse").value;
   const y=document.getElementById("adminYear").value.trim();
   if(!c){alert("First add/select a course.");return}
   if(!/^\d{4}$/.test(y)){alert("Enter a valid year, e.g. 2026.");return}
   const sk="Semester "+s;
-  if(!data[sk][c]) data[sk][c]={};
-  if(data[sk][c][y]){alert("This academic year already exists.");return}
-  data[sk][c][y]={PYQ:[],Notes:[]};
-  save();
-  document.getElementById("adminYear").value="";
-  fillSemesterSelects(); renderAdmin();
+  if(data[sk][c] && data[sk][c][y]){alert("This academic year already exists.");return}
+  if(supabaseClient){
+    const courseId=await getCourseId(s,c);
+    if(!courseId){alert("Course not found in Supabase.");return}
+    const {error}=await supabaseClient.from("academic_years").insert({course_id:courseId,academic_year:Number(y)});
+    if(error){alert("Could not add academic year: "+error.message);return}
+    await loadFromSupabase();
+  }else{if(!data[sk][c]) data[sk][c]={}; data[sk][c][y]={PYQ:[],Notes:[]}; save();}
+  document.getElementById("adminYear").value=""; fillSemesterSelects(); renderAdmin();
   alert(`Year ${y} added under ${c} — Semester ${s}.`);
 }
 
-function addAdminResource(){
+async function addAdminResource(){
+  if(supabaseClient && !(await requireAdmin())) return;
   const s=Number(document.getElementById("adminResourceSemester").value);
   const c=document.getElementById("adminResourceCourse").value;
   const y=document.getElementById("adminResourceYear").value;
@@ -304,11 +371,15 @@ function addAdminResource(){
   if(!c){alert("Select a course.");return}
   if(!y){alert("Select/add an academic year.");return}
   if(!title){alert("Enter a title.");return}
-  data["Semester "+s][c][y][type].push({title,url});
-  save();
-  document.getElementById("adminResourceTitle").value="";
-  document.getElementById("adminResourceUrl").value="";
-  renderAdmin();
+  if(supabaseClient){
+    const courseId=await getCourseId(s,c);
+    const yearId=courseId ? await getYearId(courseId,y) : null;
+    if(!yearId){alert("Academic year not found in Supabase.");return}
+    const {error}=await supabaseClient.from("resources").insert({academic_year_id:yearId,resource_type:type,title,file_url:url});
+    if(error){alert("Could not add resource: "+error.message);return}
+    await loadFromSupabase();
+  }else{data["Semester "+s][c][y][type].push({title,url}); save();}
+  document.getElementById("adminResourceTitle").value=""; document.getElementById("adminResourceUrl").value=""; renderAdmin();
   alert(`${type} added under ${c} — ${y}.`);
 }
 
@@ -351,8 +422,7 @@ function escAttr(s){return esc(s)}
 renderHome();
 
 // If Supabase credentials have been pasted, load the shared online data.
-// The current Admin write controls are intentionally left unchanged for now;
-// the next step will add Supabase Auth + secure INSERT/UPDATE/DELETE policies.
+// Admin writes use Supabase Auth and require authenticated RLS policies.
 loadFromSupabase().then(ok => {
   if (ok) {
     renderHome();
