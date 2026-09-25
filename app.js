@@ -4,6 +4,51 @@ const ADMIN_EMAIL = "2024msmt013@curaj.ac.in";
 const SEMESTERS = [1, 2, 3, 4];
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const STORAGE_BUCKET = "resources";
+const MAX_UPLOAD_MB = 25;
+
+function safeFileName(name) {
+  return String(name || "file")
+    .normalize("NFKD")
+    .replace(/[^a-zA-Z0-9._-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "") || "file";
+}
+
+async function uploadResourceFile(file, yearId) {
+  if (!file) return "";
+  if (file.size > MAX_UPLOAD_MB * 1024 * 1024) {
+    throw new Error(`File is too large. Maximum size is ${MAX_UPLOAD_MB} MB.`);
+  }
+
+  const ext = file.name.includes(".") ? file.name.split(".").pop().toLowerCase() : "bin";
+  const base = safeFileName(file.name.replace(/\.[^.]+$/, ""));
+  const path = `${yearId}/${Date.now()}-${base}.${ext}`;
+
+  const { error } = await sb.storage.from(STORAGE_BUCKET).upload(path, file, {
+    cacheControl: "3600",
+    upsert: false,
+    contentType: file.type || undefined
+  });
+
+  if (error) throw error;
+
+  const { data } = sb.storage.from(STORAGE_BUCKET).getPublicUrl(path);
+  if (!data?.publicUrl) throw new Error("Could not create public file URL.");
+  return data.publicUrl;
+}
+
+async function deleteUploadedFileByUrl(url) {
+  const marker = `/storage/v1/object/public/${STORAGE_BUCKET}/`;
+  if (!url || !url.includes(marker)) return;
+  const path = url.split(marker)[1];
+  if (!path) return;
+  try {
+    await sb.storage.from(STORAGE_BUCKET).remove([decodeURIComponent(path)]);
+  } catch (e) {
+    console.warn("Storage cleanup failed:", e);
+  }
+}
 
 let currentSemester = 1;
 let currentCourse = null;
@@ -163,6 +208,10 @@ async function openYear(year) {
 }
 
 function renderItems() {
+  const pyqBtn = document.getElementById("addPyqBtn");
+  const notesBtn = document.getElementById("addNotesBtn");
+  if (pyqBtn) pyqBtn.style.display = isAdmin() ? "block" : "none";
+  if (notesBtn) notesBtn.style.display = isAdmin() ? "block" : "none";
   const items = resources.filter(r => Number(r.academic_year_id) === Number(currentYear.id));
 
   ["PYQ","Notes"].forEach(type => {
@@ -336,7 +385,9 @@ async function addAdminResource() {
   const yearId = Number(document.getElementById("adminResourceYear").value);
   const type = document.getElementById("adminResourceType").value;
   const title = document.getElementById("adminResourceTitle").value.trim();
-  const url = document.getElementById("adminResourceUrl").value.trim();
+  const fileInput = document.getElementById("adminResourceFile");
+  const file = fileInput?.files?.[0] || null;
+  const manualUrl = document.getElementById("adminResourceUrl").value.trim();
 
   if (!yearId) {
     alert("Select/add an academic year.");
@@ -344,6 +395,23 @@ async function addAdminResource() {
   }
   if (!title) {
     alert("Enter a title.");
+    return;
+  }
+  if (!file && !manualUrl) {
+    alert("Choose a file to upload, or enter a public file URL.");
+    return;
+  }
+
+  let url = manualUrl;
+  let uploadedUrl = "";
+  try {
+    if (file) {
+      uploadedUrl = await uploadResourceFile(file, yearId);
+      url = uploadedUrl;
+    }
+  } catch (e) {
+    alert("File upload failed: " + (e.message || e));
+    console.error(e);
     return;
   }
 
@@ -355,6 +423,7 @@ async function addAdminResource() {
   });
 
   if (error) {
+    if (uploadedUrl) await deleteUploadedFileByUrl(uploadedUrl);
     alert("Could not save resource online: " + error.message);
     console.error(error);
     return;
@@ -362,6 +431,7 @@ async function addAdminResource() {
 
   document.getElementById("adminResourceTitle").value = "";
   document.getElementById("adminResourceUrl").value = "";
+  if (fileInput) fileInput.value = "";
   await loadData();
   fillSemesterSelects();
   renderAdmin();
@@ -372,15 +442,88 @@ async function deleteResource(id) {
   if (!(await requireAdmin())) return;
   if (!confirm("Delete this resource?")) return;
 
+  const existing = resources.find(r => Number(r.id) === Number(id));
   const { error } = await sb.from("resources").delete().eq("id", id);
   if (error) {
     alert("Could not delete resource: " + error.message);
     return;
   }
 
+  if (existing?.file_url) await deleteUploadedFileByUrl(existing.file_url);
+
   await loadData();
   renderItems();
   renderAdmin();
+}
+
+async function deleteYear(id) {
+  if (!(await requireAdmin())) return;
+  const yearId = Number(id);
+  const existing = years.find(y => Number(y.id) === yearId);
+  if (!existing) return;
+  if (!confirm(`Delete academic year ${existing.academic_year}? This will also delete its PYQs/Notes and uploaded files.`)) return;
+
+  const yearResources = resources.filter(r => Number(r.academic_year_id) === yearId);
+  const { error: resourceError } = await sb.from("resources").delete().eq("academic_year_id", yearId);
+  if (resourceError) {
+    alert("Could not delete resources: " + resourceError.message);
+    return;
+  }
+  for (const r of yearResources) {
+    if (r.file_url) await deleteUploadedFileByUrl(r.file_url);
+  }
+
+  const { error } = await sb.from("academic_years").delete().eq("id", yearId);
+  if (error) {
+    alert("Could not delete academic year: " + error.message);
+    return;
+  }
+
+  await loadData();
+  fillSemesterSelects();
+  renderAdmin();
+  if (currentYear && Number(currentYear.id) === yearId) goHome();
+}
+
+async function deleteCourse(id) {
+  if (!(await requireAdmin())) return;
+  const courseId = Number(id);
+  const existing = courses.find(c => Number(c.id) === courseId);
+  if (!existing) return;
+  if (!confirm(`Delete course ${existing.course_code}? This will also delete all its academic years, PYQs and Notes.`)) return;
+
+  const courseYears = years.filter(y => Number(y.course_id) === courseId);
+  const yearIds = courseYears.map(y => Number(y.id));
+  const courseResources = resources.filter(r => yearIds.includes(Number(r.academic_year_id)));
+
+  if (yearIds.length) {
+    const { error: resourceError } = await sb.from("resources").delete().in("academic_year_id", yearIds);
+    if (resourceError) {
+      alert("Could not delete course resources: " + resourceError.message);
+      return;
+    }
+    for (const r of courseResources) {
+      if (r.file_url) await deleteUploadedFileByUrl(r.file_url);
+    }
+
+    const { error: yearError } = await sb.from("academic_years").delete().in("id", yearIds);
+    if (yearError) {
+      alert("Could not delete academic years: " + yearError.message);
+      return;
+    }
+  }
+
+  const { error } = await sb.from("Courses").delete().eq("id", courseId);
+  if (error) {
+    alert("Could not delete course: " + error.message);
+    return;
+  }
+
+  await loadData();
+  fillSemesterSelects();
+  renderAdmin();
+  renderHome();
+  if (currentCourse && Number(currentCourse.id) === courseId) goHome();
 }
 
 function renderAdmin() {
@@ -391,15 +534,22 @@ function renderAdmin() {
       return `<div class="structure-row"><b>Semester ${s}</b><span>No courses added</span></div>`;
     }
 
-    return `<div class="structure-row"><b>Semester ${s}</b><span>${
-      list.map(c => {
-        const ys = years
-          .filter(y => Number(y.course_id) === Number(c.id))
-          .sort((a,b) => Number(b.academic_year) - Number(a.academic_year))
-          .map(y => y.academic_year);
-        return `${esc(c.course_code)} (${ys.length ? ys.join(", ") : "no years"})`;
-      }).join(" • ")
-    }</span></div>`;
+    return `<div class="structure-section"><div class="structure-semester"><b>Semester ${s}</b></div>${list.map(c => {
+      const ys = years
+        .filter(y => Number(y.course_id) === Number(c.id))
+        .sort((a,b) => Number(b.academic_year) - Number(a.academic_year));
+      return `<div class="structure-course">
+        <div class="structure-course-head">
+          <span><b>${esc(c.course_code)}</b> <small>${ys.length ? `${ys.length} year${ys.length===1?"":"s"}` : "No years"}</small></span>
+          <button class="danger-small" onclick="deleteCourse(${c.id})">Delete Course</button>
+        </div>
+        <div class="structure-years">${ys.length ? ys.map(y => `
+          <span class="structure-year">
+            <span>${esc(y.academic_year)}</span>
+            <button class="danger-x" onclick="deleteYear(${y.id})" title="Delete academic year">×</button>
+          </span>`).join("") : ""}</div>
+      </div>`;
+    }).join("")}</div>`;
   }).join("");
 }
 
@@ -495,10 +645,29 @@ async function saveItem() {
   }
 
   const title = document.getElementById("itemTitle").value.trim();
-  const url = document.getElementById("itemUrl").value.trim();
+  const fileInput = document.getElementById("itemFile");
+  const file = fileInput?.files?.[0] || null;
+  const manualUrl = document.getElementById("itemUrl").value.trim();
 
   if (!title) {
     alert("Please enter a title.");
+    return;
+  }
+  if (!file && !manualUrl) {
+    alert("Choose a file to upload, or enter a public file URL.");
+    return;
+  }
+
+  let url = manualUrl;
+  let uploadedUrl = "";
+  try {
+    if (file) {
+      uploadedUrl = await uploadResourceFile(file, Number(currentYear.id));
+      url = uploadedUrl;
+    }
+  } catch (e) {
+    alert("File upload failed: " + (e.message || e));
+    console.error(e);
     return;
   }
 
@@ -510,11 +679,13 @@ async function saveItem() {
   });
 
   if (error) {
+    if (uploadedUrl) await deleteUploadedFileByUrl(uploadedUrl);
     alert("Could not save resource online: " + error.message);
     return;
   }
 
   closeModal();
+  document.getElementById("itemFile").value = "";
   await loadData();
   renderItems();
   renderAdmin();

@@ -50,4 +50,18 @@
 
 .course-open,.year-open{margin-top:15px}.course-open{width:100%}.year-open{width:100%}
 
-#logoutBtn{margin-top:12px;background:#f5f7fb;border-radius:9px}.modal-box h2{margin-top:4px}
+.structure-section{border:1px solid #edf0f4;border-radius:12px;margin-bottom:12px;overflow:hidden;background:#fbfcff}
+.structure-semester{padding:12px 14px;background:#f4f7fc;color:#182238}
+.structure-course{padding:12px 14px;border-top:1px solid #edf0f4}
+.structure-course-head{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.structure-course-head small{font-weight:500;color:#7a8393;margin-left:6px}
+.structure-years{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.structure-year{display:inline-flex;align-items:center;gap:5px;background:#fff;border:1px solid #dfe5ee;border-radius:8px;padding:5px 8px;font-size:13px}
+.danger-small{border:0;background:#fff0f0;color:#c53b3b;border-radius:7px;padding:7px 10px;font-size:12px;font-weight:700;cursor:pointer}
+.danger-x{border:0;background:transparent;color:#c53b3b;font-size:18px;line-height:1;cursor:pointer;padding:0 2px}
+.site-footer{padding:0;background:#182238;color:#fff;margin-top:30px}
+.footer-inner{width:min(1050px,92%);margin:auto;padding:32px 0;text-align:center}
+.footer-brand{font-size:19px;margin-bottom:8px}
+.footer-profile{border:0;padding:4px 0 0;line-height:1.8;color:#c8d0df;font-size:14px}
+.footer-profile-title{font-size:18px;font-weight:800;color:#fff;margin-bottom:2px}
+.footer-created{color:#9faabd;font-size:13px;margin-bottom:2px}

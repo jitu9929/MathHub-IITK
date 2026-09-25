@@ -75,23 +75,6 @@
         <p>Manage courses, academic years, PYQs and Notes.</p>
       </div>
 
-      <div class="admin-profile">
-        <div class="profile-photo-wrap">
-          <div class="photo-placeholder" id="profilePlaceholder">JK</div>
-          <img class="profile-photo" id="profilePhoto" alt="Admin profile photo">
-        </div>
-        <div class="profile-info">
-          <div class="eyebrow">ADMIN PROFILE</div>
-          <h2>JITENDRA KURI</h2>
-          <p>Batch - <strong>Y25</strong></p>
-          <p>Secretary, Outreach (PG), IITK</p>
-          <p>Event Organizer, Udghosh'26, IITK</p>
-          <label class="photo-upload">📷 Add / Change Photo
-            <input type="file" id="profilePhotoInput" accept="image/*" onchange="previewProfilePhoto(event)">
-          </label>
-        </div>
-      </div>
-
       <div class="admin-box">
         <h2>1. Add Course</h2>
         <div class="inline-form">
@@ -124,9 +107,13 @@
         </div>
         <div class="inline-form admin-resource-row">
           <input id="adminResourceTitle" placeholder="Title e.g. End Semester 2026">
-          <input id="adminResourceUrl" placeholder="Public PDF / file URL">
-          <button class="primary" onclick="addAdminResource()">Add</button>
+          <input id="adminResourceFile" type="file" accept=".pdf,.doc,.docx,.ppt,.pptx,.txt,.png,.jpg,.jpeg">
+          <button class="primary" onclick="addAdminResource()">Upload & Add</button>
         </div>
+        <div class="inline-form">
+          <input id="adminResourceUrl" placeholder="Optional: public PDF / file URL">
+        </div>
+        <p class="hint">Choose a file to upload it directly to MathHub IITK. Maximum file size: 25 MB. A public URL can also be used instead.</p>
       </div>
 
       <div class="admin-box">
@@ -143,13 +130,25 @@
    <div class="eyebrow" id="modalType"></div>
    <h2 id="modalTitle"></h2>
    <label>Title<input id="itemTitle" placeholder="e.g. End Semester 2025"></label>
-   <label>PDF / File URL<input id="itemUrl" placeholder="Paste public PDF link"></label>
-   <p class="hint">Paste a public PDF/file link. The item will appear under the selected course and academic year.</p>
-   <button class="primary full" onclick="saveItem()">Save</button>
+   <label>Upload PDF / File<input id="itemFile" type="file" accept=".pdf,.doc,.docx,.ppt,.pptx,.txt,.png,.jpg,.jpeg"></label>
+   <label>Optional public URL<input id="itemUrl" placeholder="Paste public PDF link"></label>
+   <p class="hint">Choose a file to upload it directly to MathHub IITK (maximum 25 MB), or use a public URL.</p>
+   <button class="primary full" onclick="saveItem()">Upload & Save</button>
  </div>
 </div>
 
-<footer>📐 MathHub IITK <span>• Created & maintained by Jitendra Kuri</span></footer>
+<footer class="site-footer">
+  <div class="footer-inner">
+    <div class="footer-brand">📐 <b>MathHub IITK</b></div>
+    <div class="footer-created">Created &amp; maintained by</div>
+    <div class="footer-profile">
+      <div class="footer-profile-title">JITENDRA KURI</div>
+      <div>Batch - Y25</div>
+      <div>Secretary, Outreach (PG), IITK</div>
+      <div>Event Organizer, Udghosh'26, IITK</div>
+    </div>
+  </div>
+</footer>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="app.js"></script>
 </body>
