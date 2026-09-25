@@ -12,6 +12,76 @@ const supabaseClient = supabaseConfigured
   ? window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY)
   : null;
 
+const ADMIN_EMAIL = "2024msmt013@curaj.ac.in";
+let currentSession = null;
+
+async function getSession(){
+  if(!supabaseClient) return null;
+  const { data } = await supabaseClient.auth.getSession();
+  currentSession = data.session || null;
+  return currentSession;
+}
+
+async function isAdmin(){
+  const session = await getSession();
+  return !!(session && session.user && session.user.email && session.user.email.toLowerCase() === ADMIN_EMAIL.toLowerCase());
+}
+
+function requireAdmin(action){
+  isAdmin().then(ok=>{
+    if(!ok) showLoginModal(action || "Admin access");
+  });
+}
+
+function showLoginModal(afterLogin){
+  let m=document.getElementById("authModal");
+  if(!m){
+    m=document.createElement("div");
+    m.id="authModal";
+    m.style.cssText="position:fixed;inset:0;background:#17203399;display:grid;place-items:center;padding:20px;z-index:50";
+    m.innerHTML=`<div style="position:relative;background:#fff;border-radius:18px;padding:30px;width:min(430px,100%);box-shadow:0 25px 80px #0003">
+      <button id="authClose" style="position:absolute;right:14px;top:10px;border:0;background:none;font-size:28px;color:#7a8393;cursor:pointer">×</button>
+      <div style="font-size:11px;letter-spacing:2px;font-weight:800;color:#315ed0;margin-bottom:10px">ADMIN LOGIN</div>
+      <h2 style="margin:0 0 8px">MathHub IITK</h2>
+      <p style="color:#778194;font-size:14px">Login with the authorized Admin account.</p>
+      <label style="display:block;font-size:13px;font-weight:700;margin:14px 0">Email<input id="authEmail" type="email" value="${ADMIN_EMAIL}" style="display:block;width:100%;margin-top:7px;padding:12px;border:1px solid #dbe1ea;border-radius:9px"></label>
+      <label style="display:block;font-size:13px;font-weight:700;margin:14px 0">Password<input id="authPassword" type="password" placeholder="Enter password" style="display:block;width:100%;margin-top:7px;padding:12px;border:1px solid #dbe1ea;border-radius:9px"></label>
+      <p id="authError" style="display:none;color:#c43b3b;font-size:13px"></p>
+      <button id="authLogin" class="primary" style="width:100%">Login</button>
+    </div>`;
+    document.body.appendChild(m);
+    document.getElementById("authClose").onclick=()=>m.remove();
+    document.getElementById("authLogin").onclick=async()=>{
+      const email=document.getElementById("authEmail").value.trim();
+      const password=document.getElementById("authPassword").value;
+      const err=document.getElementById("authError");
+      err.style.display="none";
+      if(email.toLowerCase()!==ADMIN_EMAIL.toLowerCase()){err.textContent="This account is not authorized as MathHub Admin.";err.style.display="block";return}
+      if(!password){err.textContent="Enter your password.";err.style.display="block";return}
+      const {data,error}=await supabaseClient.auth.signInWithPassword({email,password});
+      if(error){err.textContent=error.message;err.style.display="block";return}
+      currentSession=data.session;
+      m.remove();
+      if(afterLogin){openAdmin();}
+    };
+  }
+}
+
+async function logoutAdmin(){
+  if(supabaseClient) await supabaseClient.auth.signOut();
+  currentSession=null;
+  goHome();
+}
+
+function addAdminControls(){
+  const title=document.querySelector("#adminPage .page-title");
+  if(title && !document.getElementById("adminLogout")){
+    const b=document.createElement("button");
+    b.id="adminLogout"; b.className="primary"; b.textContent="Logout"; b.style.marginTop="8px"; b.onclick=logoutAdmin;
+    title.appendChild(b);
+  }
+}
+
 async function loadFromSupabase() {
   if (!supabaseClient) return false;
 
@@ -59,6 +129,7 @@ async function loadFromSupabase() {
             .forEach(r => {
               const type = r.resource_type === "Notes" ? "Notes" : "PYQ";
               remote[sk][c.course_code][String(y.academic_year)][type].push({
+                id: r.id,
                 title: r.title || "Resource",
                 url: r.file_url || ""
               });
@@ -201,38 +272,77 @@ function renderItems(){
         <button class="back" onclick="deleteItem('${type}',${i})">×</button>
       </div>`).join("") : '<p style="color:#8a93a2;font-size:14px">Nothing added yet.</p>';
   });
+  isAdmin().then(ok=>{
+    document.querySelectorAll("#yearPage .add-btn").forEach(b=>b.style.display=ok?"block":"none");
+    document.querySelectorAll("#yearPage .item .back").forEach(b=>b.style.display=ok?"inline-block":"none");
+  });
 }
 
 function openAdd(type){
-  currentType=type;
-  document.getElementById("modalType").textContent=type;
-  document.getElementById("modalTitle").textContent=`Add ${type}`;
-  document.getElementById("itemTitle").value="";
-  document.getElementById("itemUrl").value="";
-  document.getElementById("modal").classList.remove("hidden");
+  isAdmin().then(ok=>{
+    if(!ok){showLoginModal();return}
+    currentType=type;
+    document.getElementById("modalType").textContent=type;
+    document.getElementById("modalTitle").textContent=`Add ${type}`;
+    document.getElementById("itemTitle").value="";
+    document.getElementById("itemUrl").value="";
+    document.getElementById("modal").classList.remove("hidden");
+  });
 }
 function closeModal(){document.getElementById("modal").classList.add("hidden")}
-function saveItem(){
+async function saveItem(){
+  if(!(await isAdmin())){closeModal();showLoginModal();return}
   const title=document.getElementById("itemTitle").value.trim();
   const url=document.getElementById("itemUrl").value.trim();
   if(!title){alert("Please enter a title.");return}
-  data[semesterKey()][currentCourse][currentYear][currentType].push({title,url});
+
+  if(supabaseClient){
+    const {data:yr,error}=await supabaseClient
+      .from("academic_years")
+      .select("id")
+      .eq("academic_year",Number(currentYear))
+      .eq("course_id",await findCourseId(currentSemester,currentCourse))
+      .single();
+    if(error || !yr){alert("Academic year not found in Supabase. Please use Admin → Add Academic Year.");return}
+    const {data:row,error:rErr}=await supabaseClient.from("resources").insert({
+      academic_year_id:yr.id, resource_type:currentType, title, file_url:url
+    }).select("id").single();
+    if(rErr){alert("Could not save online: "+rErr.message);return}
+    data[semesterKey()][currentCourse][currentYear][currentType].push({id:row.id,title,url});
+  }else{
+    data[semesterKey()][currentCourse][currentYear][currentType].push({title,url});
+  }
   save(); closeModal(); renderItems();
 }
-function deleteItem(type,i){
-  if(confirm("Delete this resource?")){
-    data[semesterKey()][currentCourse][currentYear][type].splice(i,1);
-    save(); renderItems();
+async function deleteItem(type,i){
+  if(!(await isAdmin())){showLoginModal();return}
+  const item=data[semesterKey()][currentCourse][currentYear][type][i];
+  if(!confirm("Delete this resource?")) return;
+  if(supabaseClient && item && item.id){
+    const {error}=await supabaseClient.from("resources").delete().eq("id",item.id);
+    if(error){alert("Could not delete online: "+error.message);return}
   }
+  data[semesterKey()][currentCourse][currentYear][type].splice(i,1);
+  save(); renderItems();
+}
+
+async function findCourseId(s,c){
+  const {data:row,error}=await supabaseClient.from("Courses").select("id").eq("semester",s).eq("course_code",c).single();
+  if(error) return null;
+  return row.id;
 }
 
 // ---------- ADMIN ----------
 function openAdmin(){
-  hideAll();
-  document.getElementById("adminPage").classList.remove("hidden");
-  fillSemesterSelects();
-  renderAdmin();
-  loadAdminProfile();
+  isAdmin().then(ok=>{
+    if(!ok){showLoginModal("Admin");return}
+    hideAll();
+    document.getElementById("adminPage").classList.remove("hidden");
+    fillSemesterSelects();
+    renderAdmin();
+    loadAdminProfile();
+    addAdminControls();
+  });
 }
 
 function fillSemesterSelects(){
@@ -263,20 +373,26 @@ function populateAdminYears(){
   el.innerHTML=years.length ? years.map(y=>`<option value="${escAttr(y)}">${esc(y)}</option>`).join("") : '<option value="">No year</option>';
 }
 
-function addCourse(){
+async function addCourse(){
+  if(!(await isAdmin())){showLoginModal();return}
   const s=Number(document.getElementById("adminCourseSemester").value);
   const c=document.getElementById("adminCourse").value.trim().toUpperCase();
   if(!c){alert("Enter a course code/name, e.g. MTH403.");return}
   const sk="Semester "+s;
   if(data[sk][c]){alert("This course already exists.");return}
-  data[sk][c]={};
-  save();
+
+  if(supabaseClient){
+    const {error}=await supabaseClient.from("Courses").insert({semester:s,course_code:c,course_name:c});
+    if(error){alert("Could not save course online: "+error.message);return}
+  }
+  data[sk][c]={}; save();
   document.getElementById("adminCourse").value="";
   fillSemesterSelects(); renderAdmin(); renderHome();
   alert(`${c} added to Semester ${s}.`);
 }
 
-function addYear(){
+async function addYear(){
+  if(!(await isAdmin())){showLoginModal();return}
   const s=Number(document.getElementById("adminYearSemester").value);
   const c=document.getElementById("adminYearCourse").value;
   const y=document.getElementById("adminYear").value.trim();
@@ -285,14 +401,21 @@ function addYear(){
   const sk="Semester "+s;
   if(!data[sk][c]) data[sk][c]={};
   if(data[sk][c][y]){alert("This academic year already exists.");return}
-  data[sk][c][y]={PYQ:[],Notes:[]};
-  save();
+
+  if(supabaseClient){
+    const courseId=await findCourseId(s,c);
+    if(!courseId){alert("Course not found in Supabase. Please add the course first.");return}
+    const {error}=await supabaseClient.from("academic_years").insert({course_id:courseId,academic_year:Number(y)});
+    if(error){alert("Could not save year online: "+error.message);return}
+  }
+  data[sk][c][y]={PYQ:[],Notes:[]}; save();
   document.getElementById("adminYear").value="";
   fillSemesterSelects(); renderAdmin();
   alert(`Year ${y} added under ${c} — Semester ${s}.`);
 }
 
-function addAdminResource(){
+async function addAdminResource(){
+  if(!(await isAdmin())){showLoginModal();return}
   const s=Number(document.getElementById("adminResourceSemester").value);
   const c=document.getElementById("adminResourceCourse").value;
   const y=document.getElementById("adminResourceYear").value;
@@ -302,7 +425,18 @@ function addAdminResource(){
   if(!c){alert("Select a course.");return}
   if(!y){alert("Select/add an academic year.");return}
   if(!title){alert("Enter a title.");return}
-  data["Semester "+s][c][y][type].push({title,url});
+
+  if(supabaseClient){
+    const courseId=await findCourseId(s,c);
+    if(!courseId){alert("Course not found online.");return}
+    const {data:yr,error:yErr}=await supabaseClient.from("academic_years").select("id").eq("course_id",courseId).eq("academic_year",Number(y)).single();
+    if(yErr || !yr){alert("Academic year not found online.");return}
+    const {data:row,error}=await supabaseClient.from("resources").insert({academic_year_id:yr.id,resource_type:type,title,file_url:url}).select("id").single();
+    if(error){alert("Could not save resource online: "+error.message);return}
+    data["Semester "+s][c][y][type].push({id:row.id,title,url});
+  }else{
+    data["Semester "+s][c][y][type].push({title,url});
+  }
   save();
   document.getElementById("adminResourceTitle").value="";
   document.getElementById("adminResourceUrl").value="";
@@ -348,9 +482,12 @@ function escAttr(s){return esc(s)}
 
 renderHome();
 
-// If Supabase credentials have been pasted, load the shared online data.
-// The current Admin write controls are intentionally left unchanged for now;
-// the next step will add Supabase Auth + secure INSERT/UPDATE/DELETE policies.
+if (supabaseClient) {
+  supabaseClient.auth.getSession().then(({data})=>{ currentSession=data.session || null; });
+  supabaseClient.auth.onAuthStateChange((_event,session)=>{ currentSession=session || null; });
+}
+
+// Load shared online data. Local UI remains available if Supabase is temporarily unavailable.
 loadFromSupabase().then(ok => {
   if (ok) {
     renderHome();
