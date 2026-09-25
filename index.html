@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MathHub IITK</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <div class="brand">📐 <span>MathHub IITK</span></div>
+  <nav>
+    <button onclick="goHome()">Home</button>
+    <button onclick="openAdmin()">Admin</button>
+  </nav>
+</header>
+
+<main id="app">
+  <section id="homePage">
+    <div class="hero">
+      <div class="hero-glow glow-one"></div><div class="hero-glow glow-two"></div>
+      <div class="hero-content">
+        <div class="hero-badge">✦ IIT KANPUR • MATHEMATICS</div>
+        <h1>MathHub <span>IITK</span></h1>
+        <p>Your clean, organized space for <b>PYQs, Notes & study material.</b></p>
+        <div class="hero-pills"><span>📝 PYQs</span><span>📚 Notes</span><span>🎓 4 Semesters</span></div>
+      </div>
+    </div>
+    <div class="container">
+      <h2>Select Semester</h2>
+      <div class="semester-grid" id="semesterGrid"></div>
+    </div>
+  </section>
+
+  <section id="semesterPage" class="hidden">
+    <div class="container">
+      <button class="back" onclick="goHome()">← Back to Semesters</button>
+      <div class="page-title">
+        <div class="eyebrow">SEMESTER</div>
+        <h1 id="semesterTitle"></h1>
+        <p>Select a course.</p>
+      </div>
+      <div class="course-grid" id="courseGrid"></div>
+    </div>
+  </section>
+
+  <section id="yearPage" class="hidden">
+    <div class="container">
+      <button class="back" onclick="openCourse(currentCourse)">← Back to Courses</button>
+      <div class="page-title">
+        <div class="eyebrow" id="breadcrumb"></div>
+        <h1 id="yearTitle"></h1>
+      </div>
+      <div class="resource-columns">
+        <div class="resource-card">
+          <div class="resource-head"><span>📝</span><div><h2>PYQs</h2><p>Previous Year Questions</p></div></div>
+          <div id="pyqList"></div>
+          <button class="add-btn" onclick="openAdd('PYQ')">＋ Add PYQ</button>
+        </div>
+        <div class="resource-card">
+          <div class="resource-head"><span>📚</span><div><h2>Notes</h2><p>Lecture & study notes</p></div></div>
+          <div id="notesList"></div>
+          <button class="add-btn" onclick="openAdd('Notes')">＋ Add Notes</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="adminPage" class="hidden">
+    <div class="container">
+      <button class="back" onclick="goHome()">← Back</button>
+      <div class="page-title">
+        <div class="eyebrow">MANAGEMENT</div>
+        <h1>Admin</h1>
+        <p>Manage courses, academic years, PYQs and Notes.</p>
+      </div>
+
+      <div class="admin-box">
+        <h2>1. Add Course</h2>
+        <div class="inline-form">
+          <select id="adminCourseSemester"></select>
+          <input id="adminCourse" placeholder="e.g. MTH403">
+          <button class="primary" onclick="addCourse()">Add Course</button>
+        </div>
+      </div>
+
+      <div class="admin-box">
+        <h2>2. Add Academic Year</h2>
+        <div class="inline-form">
+          <select id="adminYearSemester" onchange="populateAdminCourses('adminYearSemester','adminYearCourse')"></select>
+          <select id="adminYearCourse"></select>
+          <input id="adminYear" placeholder="e.g. 2026">
+          <button class="primary" onclick="addYear()">Add Year</button>
+        </div>
+      </div>
+
+      <div class="admin-box">
+        <h2>3. Add PYQ / Notes</h2>
+        <div class="inline-form">
+          <select id="adminResourceSemester" onchange="populateAdminCourses('adminResourceSemester','adminResourceCourse'); populateAdminYears()"></select>
+          <select id="adminResourceCourse" onchange="populateAdminYears()"></select>
+          <select id="adminResourceYear"></select>
+          <select id="adminResourceType">
+            <option value="PYQ">PYQ</option>
+            <option value="Notes">Notes</option>
+          </select>
+        </div>
+        <div class="inline-form admin-resource-row">
+          <input id="adminResourceTitle" placeholder="Title e.g. End Semester 2026">
+          <input id="adminResourceFile" type="file" accept=".pdf,.doc,.docx,.ppt,.pptx,.txt,.png,.jpg,.jpeg">
+          <button class="primary" onclick="addAdminResource()">Upload & Add</button>
+        </div>
+        <div class="inline-form">
+          <input id="adminResourceUrl" placeholder="Optional: public PDF / file URL">
+        </div>
+        <p class="hint">Choose a file to upload it directly to MathHub IITK. Maximum file size: 25 MB. A public URL can also be used instead.</p>
+      </div>
+
+      <div class="admin-box">
+        <h2>Current structure</h2>
+        <div id="adminStructure"></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<div class="modal hidden" id="modal">
+ <div class="modal-box">
+   <button class="close" onclick="closeModal()">×</button>
+   <div class="eyebrow" id="modalType"></div>
+   <h2 id="modalTitle"></h2>
+   <label>Title<input id="itemTitle" placeholder="e.g. End Semester 2025"></label>
+   <label>Upload PDF / File<input id="itemFile" type="file" accept=".pdf,.doc,.docx,.ppt,.pptx,.txt,.png,.jpg,.jpeg"></label>
+   <label>Optional public URL<input id="itemUrl" placeholder="Paste public PDF link"></label>
+   <p class="hint">Choose a file to upload it directly to MathHub IITK (maximum 25 MB), or use a public URL.</p>
+   <button class="primary full" onclick="saveItem()">Upload & Save</button>
+ </div>
+</div>
+
+<footer class="site-footer">
+  <div class="footer-inner">
+    <div class="footer-brand">📐 <b>MathHub IITK</b></div>
+    <div class="footer-created">Created &amp; maintained by</div>
+    <div class="footer-profile">
+      <div class="footer-profile-title">JITENDRA KURI</div>
+      <div>Batch - Y25</div>
+      <div>Secretary, Outreach (PG), IITK</div>
+      <div>Event Organizer, Udghosh'26, IITK</div>
+    </div>
+  </div>
+</footer>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="app.js"></script>
+</body>
+</html>
