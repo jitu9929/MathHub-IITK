@@ -38,15 +38,15 @@
       <div class="page-title">
         <div class="eyebrow">SEMESTER</div>
         <h1 id="semesterTitle"></h1>
-        <p>Select an academic year.</p>
+        <p>Select a course.</p>
       </div>
-      <div class="year-grid" id="yearGrid"></div>
+      <div class="course-grid" id="courseGrid"></div>
     </div>
   </section>
 
   <section id="yearPage" class="hidden">
     <div class="container">
-      <button class="back" onclick="openSemester(currentSemester)">← Back to Semester</button>
+      <button class="back" onclick="openCourse(currentCourse)">← Back to Courses</button>
       <div class="page-title">
         <div class="eyebrow" id="breadcrumb"></div>
         <h1 id="yearTitle"></h1>
@@ -70,41 +70,65 @@
     <div class="container">
       <button class="back" onclick="goHome()">← Back</button>
       <div class="page-title">
-  <div class="eyebrow">MANAGEMENT</div>
-  <h1>Admin</h1>
-  <p>Add years and study material to any semester.</p>
-</div>
-<div class="admin-profile">
-  <div class="profile-photo-wrap">
-    <div class="photo-placeholder" id="profilePlaceholder">JK</div>
-    <img class="profile-photo" id="profilePhoto" alt="Admin profile photo">
-  </div>
-  <div class="profile-info">
-    <div class="eyebrow">ADMIN PROFILE</div>
-    <h2>Jitendra Kuri</h2>
-    <p>Batch <strong>Y25</strong></p>
-    <label class="photo-upload">📷 Add / Change Photo
-      <input type="file" id="profilePhotoInput" accept="image/*" onchange="previewProfilePhoto(event)">
-    </label>
-  </div>
-</div>
-<div class="admin-box">
-  <h2>Admin Contact</h2>
-  <div class="contact-form">
-    <label>Email Address
-      <input id="adminEmail" type="email" placeholder="your@email.com">
-    </label>
-    <button class="primary" onclick="saveAdminProfile()">Save Profile</button>
-  </div>
-</div>
+        <div class="eyebrow">MANAGEMENT</div>
+        <h1>Admin</h1>
+        <p>Manage courses, academic years, PYQs and Notes.</p>
+      </div>
+
+      <div class="admin-profile">
+        <div class="profile-photo-wrap">
+          <div class="photo-placeholder" id="profilePlaceholder">JK</div>
+          <img class="profile-photo" id="profilePhoto" alt="Admin profile photo">
+        </div>
+        <div class="profile-info">
+          <div class="eyebrow">ADMIN PROFILE</div>
+          <h2>JITENDRA KURI</h2>
+          <p>Batch - <strong>Y25</strong></p>
+          <p>Secretary, Outreach (PG), IITK</p>
+          <p>Event Organizer, Udghosh'26, IITK</p>
+          <label class="photo-upload">📷 Add / Change Photo
+            <input type="file" id="profilePhotoInput" accept="image/*" onchange="previewProfilePhoto(event)">
+          </label>
+        </div>
+      </div>
+
       <div class="admin-box">
-        <h2>Add Academic Year</h2>
+        <h2>1. Add Course</h2>
         <div class="inline-form">
-          <select id="adminSemester"></select>
+          <select id="adminCourseSemester"></select>
+          <input id="adminCourse" placeholder="e.g. MTH403">
+          <button class="primary" onclick="addCourse()">Add Course</button>
+        </div>
+      </div>
+
+      <div class="admin-box">
+        <h2>2. Add Academic Year</h2>
+        <div class="inline-form">
+          <select id="adminYearSemester" onchange="populateAdminCourses('adminYearSemester','adminYearCourse')"></select>
+          <select id="adminYearCourse"></select>
           <input id="adminYear" placeholder="e.g. 2026">
           <button class="primary" onclick="addYear()">Add Year</button>
         </div>
       </div>
+
+      <div class="admin-box">
+        <h2>3. Add PYQ / Notes</h2>
+        <div class="inline-form">
+          <select id="adminResourceSemester" onchange="populateAdminCourses('adminResourceSemester','adminResourceCourse'); populateAdminYears()"></select>
+          <select id="adminResourceCourse" onchange="populateAdminYears()"></select>
+          <select id="adminResourceYear"></select>
+          <select id="adminResourceType">
+            <option value="PYQ">PYQ</option>
+            <option value="Notes">Notes</option>
+          </select>
+        </div>
+        <div class="inline-form admin-resource-row">
+          <input id="adminResourceTitle" placeholder="Title e.g. End Semester 2026">
+          <input id="adminResourceUrl" placeholder="Public PDF / file URL">
+          <button class="primary" onclick="addAdminResource()">Add</button>
+        </div>
+      </div>
+
       <div class="admin-box">
         <h2>Current structure</h2>
         <div id="adminStructure"></div>
@@ -120,7 +144,7 @@
    <h2 id="modalTitle"></h2>
    <label>Title<input id="itemTitle" placeholder="e.g. End Semester 2025"></label>
    <label>PDF / File URL<input id="itemUrl" placeholder="Paste public PDF link"></label>
-   <p class="hint">For this first version, upload the PDF somewhere with a public link and paste the link here.</p>
+   <p class="hint">Paste a public PDF/file link. The item will appear under the selected course and academic year.</p>
    <button class="primary full" onclick="saveItem()">Save</button>
  </div>
 </div>

@@ -38,3 +38,14 @@
 .photo-upload{display:inline-block;background:#edf3ff;color:#315ed0;border-radius:9px;padding:9px 12px;font-size:13px;font-weight:700;cursor:pointer}
 .photo-upload input{display:none}
 @media(max-width:650px){.contact-form{flex-direction:column;align-items:stretch}.contact-form label{min-width:0}.admin-profile{align-items:flex-start}}
+
+.course-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;padding-bottom:70px}
+.course{background:#fff;border:1px solid #e1e6ef;border-radius:17px;padding:25px;cursor:pointer;transition:.2s}
+.course:hover{transform:translateY(-4px);box-shadow:0 15px 35px #243b6412}
+.course-icon{width:50px;height:50px;border-radius:14px;background:#edf3ff;color:#315ed0;display:grid;place-items:center;font-size:21px;font-weight:800}
+.course h3{margin:16px 0 5px;font-size:20px}
+.admin-resource-row{margin-top:10px}
+@media(max-width:750px){.course-grid{grid-template-columns:1fr 1fr}}
+@media(max-width:450px){.course-grid{grid-template-columns:1fr}}
+
+.course-open,.year-open{margin-top:15px}.course-open{width:100%}.year-open{width:100%}
