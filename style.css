@@ -49,3 +49,12 @@
 @media(max-width:450px){.course-grid{grid-template-columns:1fr}}
 
 .course-open,.year-open{margin-top:15px}.course-open{width:100%}.year-open{width:100%}
+
+
+/* Footer admin profile */
+footer{text-align:center;padding:30px 5%;background:#182238;color:#fff;margin-top:30px}
+.footer-brand{font-size:18px;font-weight:800;margin-bottom:16px}
+.footer-profile{display:inline-block;min-width:280px}
+.footer-profile-title{font-size:12px;color:#aeb7c8;letter-spacing:.5px;margin-bottom:5px}
+.footer-profile-name{font-size:17px;font-weight:800;margin-bottom:5px}
+.footer-profile-meta,.footer-profile-role{font-size:13px;color:#c1c9d6;margin-top:4px}
