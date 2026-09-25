@@ -1,3 +1,84 @@
+// ================= SUPABASE CONNECTION =================
+// Paste your Supabase Project URL and Publishable key below.
+// Do NOT paste the sb_secret_... key here.
+const SUPABASE_URL = "https://lwakgikyaqybovfivrbq.supabase.co
+
+";
+const SUPABASE_PUBLISHABLE_KEY = "sb_publishable__RqSu4NpgxLpmVAc1KxYCQ_LFxpuclq";
+
+const supabaseConfigured =
+  SUPABASE_URL.startsWith("https://") &&
+  SUPABASE_PUBLISHABLE_KEY.startsWith("sb_");
+
+const supabaseClient = supabaseConfigured
+  ? window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY)
+  : null;
+
+async function loadFromSupabase() {
+  if (!supabaseClient) return false;
+
+  try {
+    const { data: courses, error: cErr } = await supabaseClient
+      .from("Courses")
+      .select("id,semester,course_code,course_name")
+      .order("semester")
+      .order("course_code");
+
+    if (cErr) throw cErr;
+
+    const { data: years, error: yErr } = await supabaseClient
+      .from("academic_years")
+      .select("id,course_id,academic_year")
+      .order("academic_year", { ascending: false });
+
+    if (yErr) throw yErr;
+
+    const { data: resources, error: rErr } = await supabaseClient
+      .from("resources")
+      .select("id,academic_year_id,resource_type,title,file_url")
+      .order("id");
+
+    if (rErr) throw rErr;
+
+    const remote = {};
+    SEMESTERS.forEach(s => remote["Semester " + s] = {});
+
+    (courses || []).forEach(c => {
+      const sk = "Semester " + c.semester;
+      if (!remote[sk]) remote[sk] = {};
+      remote[sk][c.course_code] = {};
+
+      (years || [])
+        .filter(y => y.course_id === c.id)
+        .forEach(y => {
+          remote[sk][c.course_code][String(y.academic_year)] = {
+            PYQ: [],
+            Notes: []
+          };
+
+          (resources || [])
+            .filter(r => r.academic_year_id === y.id)
+            .forEach(r => {
+              const type = r.resource_type === "Notes" ? "Notes" : "PYQ";
+              remote[sk][c.course_code][String(y.academic_year)][type].push({
+                title: r.title || "Resource",
+                url: r.file_url || ""
+              });
+            });
+        });
+    });
+
+    data = remote;
+    localStorage.setItem(KEY, JSON.stringify(data));
+    return true;
+  } catch (err) {
+    console.error("Supabase load failed:", err);
+    return false;
+  }
+}
+
+// ========================================================
+
 const SEMESTERS=[1,2,3,4];
 const KEY="mathhub_iitk_data_v6_clean";
 let data=JSON.parse(localStorage.getItem(KEY)||"null");
@@ -268,3 +349,15 @@ function esc(s){return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",
 function escAttr(s){return esc(s)}
 
 renderHome();
+
+// If Supabase credentials have been pasted, load the shared online data.
+// The current Admin write controls are intentionally left unchanged for now;
+// the next step will add Supabase Auth + secure INSERT/UPDATE/DELETE policies.
+loadFromSupabase().then(ok => {
+  if (ok) {
+    renderHome();
+    if (!document.getElementById("semesterPage").classList.contains("hidden")) {
+      renderCourses();
+    }
+  }
+});
