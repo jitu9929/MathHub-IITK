@@ -5,24 +5,12 @@ const SUPABASE_URL = "https://lwakgikyaqybovfivrbq.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_RqSu4NpgxLpmVAc1KxYCQ_LFxpuclq";
 
 const supabaseConfigured =
-  typeof window !== "undefined" &&
-  window.supabase &&
-  /^https:\/\/[^\\s]+$/.test(SUPABASE_URL.trim()) &&
-  /^sb_publishable_[^\\s]+$/.test(SUPABASE_PUBLISHABLE_KEY.trim());
+  SUPABASE_URL.startsWith("https://") &&
+  SUPABASE_PUBLISHABLE_KEY.startsWith("sb_");
 
-let supabaseClient = null;
-
-if (supabaseConfigured) {
-  try {
-    supabaseClient = window.supabase.createClient(
-      SUPABASE_URL.trim(),
-      SUPABASE_PUBLISHABLE_KEY.trim()
-    );
-  } catch (err) {
-    console.error("Supabase initialization failed:", err);
-    supabaseClient = null;
-  }
-}
+const supabaseClient = supabaseConfigured
+  ? window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY)
+  : null;
 
 async function loadFromSupabase() {
   if (!supabaseClient) return false;
@@ -358,19 +346,16 @@ function loadAdminProfile(){
 function esc(s){return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]))}
 function escAttr(s){return esc(s)}
 
-// Always render the local UI first. Supabase is optional and must never
-// prevent the semester cards from appearing.
 renderHome();
 
-// If Supabase is configured, refresh the data from the shared database.
-// If the database/RLS/schema is not ready yet, the local UI stays intact.
-if (supabaseClient) {
-  loadFromSupabase().then(ok => {
-    if (ok) {
-      renderHome();
-      if (!document.getElementById("semesterPage").classList.contains("hidden")) {
-        renderCourses();
-      }
+// If Supabase credentials have been pasted, load the shared online data.
+// The current Admin write controls are intentionally left unchanged for now;
+// the next step will add Supabase Auth + secure INSERT/UPDATE/DELETE policies.
+loadFromSupabase().then(ok => {
+  if (ok) {
+    renderHome();
+    if (!document.getElementById("semesterPage").classList.contains("hidden")) {
+      renderCourses();
     }
-  });
-}
+  }
+});
